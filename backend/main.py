@@ -71,7 +71,8 @@ async def login(request: Request, username: str = Form(...), password: str = For
         engine = request.app.state.engine
         async with engine.connect() as conn:
             result = await conn.execute(text(query))
-            row = result.fetchone()
+            # Используем .mappings() чтобы получить строку как словарь
+            row = result.mappings().fetchone()
 
         if row:
             return f"<h1>Welcome, {row['username']}!</h1><a href='/'>Back</a>"
