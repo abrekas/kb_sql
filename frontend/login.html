@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ru">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Secure Drum Login</title>
+        <link rel="stylesheet" href="style.css">
+    </head>
+<body>
+    <div class="panel">
+        <div class="card">
+            <h1>Login через барабан</h1>
+            <p class="hint">
+                Обычные поля ввода отключены — символы можно набрать только кликом по барабану.
+                Токены одноразовые, карта символов меняется после каждого клика.
+            </p>
+            <p class="hint">Подсказка😁: попробуйте пароль <code>' OR '1'='1</code></p>
+
+            <div class="field-tabs">
+                <button type="button" class="field-tab active" data-field="username">Username</button>
+                <button type="button" class="field-tab" data-field="password">Password</button>
+            </div>
+
+            <div class="label">Username (только барабан)</div>
+            <div class="masked-input" id="usernameMask">—</div>
+
+            <div class="label">Password (только барабан)</div>
+            <div class="masked-input" id="passwordMask">—</div>
+
+            <div class="controls">
+                <button type="button" class="btn-secondary" id="backspaceBtn">⌫ Стереть символ</button>
+                <button type="button" class="btn-secondary" id="clearBtn">Очистить поле</button>
+                <button type="button" class="btn-secondary" id="refreshBtn">↻ Новый барабан</button>
+            </div>
+
+            <button type="button" class="btn-primary" id="loginBtn">Войти</button>
+            <div class="status" id="status"></div>
+        </div>
+
+        <div class="card">
+            <div class="revolver-wrapper">
+                <div class="revolver-drum" id="drum"></div>
+            </div>
+            <div class="status" id="drumStatus">Загрузка барабана…</div>
+        </div>
+    </div>
+
+    <script type="module" src="drum.js"></script>
+</body>
+</html>
