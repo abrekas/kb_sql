@@ -2,12 +2,13 @@ const express = require('express');
 const session = require('express-session');
 const crypto = require('crypto');
 const path = require('path');
+const { initDb, runVulnerableLogin } = require('./main');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const PYTHON_URL = process.env.PYTHON_URL || 'http://127.0.0.1:8000';
-const INTERNAL_KEY = process.env.INTERNAL_KEY || 'dev-secret-key';
 const DRUM_SIZE = 16;
+
+initDb();
 
 // token -> реальный символ (одноразовая карта на текущий барабан)
 const drumMaps = new Map();
@@ -172,39 +173,21 @@ app.post('/api/clear-field', (req, res) => {
   });
 });
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', (req, res) => {
   const input = ensureSessionInput(req);
 
   if (!input.username || !input.password) {
     return res.status(400).json({ error: 'Сначала наберите логин и пароль на барабане.' });
   }
 
-  try {
-    const body = new URLSearchParams({
-      username: input.username,
-      password: input.password,
-    });
+  const { status, html } = runVulnerableLogin(input.username, input.password);
 
-    const pythonResponse = await fetch(`${PYTHON_URL}/internal/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'X-Internal-Key': INTERNAL_KEY,
-      },
-      body,
-    });
+  input.username = '';
+  input.password = '';
+  burnDrum(req.session.id);
+  delete req.session.drumClient;
 
-    const html = await pythonResponse.text();
-    input.username = '';
-    input.password = '';
-    burnDrum(req.session.id);
-
-    res.status(pythonResponse.status).type('html').send(html);
-  } catch (error) {
-    res.status(502).send(
-      `<h1>Python-бэкенд недоступен</h1><p>${error.message}</p><p>Запустите: uvicorn main:app --port 8000</p>`
-    );
-  }
+  res.status(status).type('html').send(html);
 });
 
 app.get('/', (_req, res) => {
@@ -212,6 +195,5 @@ app.get('/', (_req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Drum gateway: http://127.0.0.1:${PORT}`);
-  console.log(`Python backend expected at ${PYTHON_URL}`);
+  console.log(`Server: http://127.0.0.1:${PORT}`);
 });
