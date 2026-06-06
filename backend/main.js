@@ -1,36 +1,39 @@
-const path = require('path');
-const Database = require('better-sqlite3');
+const { Pool } = require('pg');
 
-const DB_PATH = path.join(__dirname, 'test.db');
+const pool = new Pool({
+  connectionString:
+    process.env.DATABASE_URL ||
+    // 'postgresql://postgres:postgres@127.0.0.1:5432/kb_project',
+    'postgresql://neondb_owner:npg_Meo0Ay9iqsUB@ep-lucky-breeze-a2008cpo-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require',
+});
 
-let db;
-
-function initDb() {
-  db = new Database(DB_PATH);
-
-  db.exec(`
+async function initDb() {
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       username TEXT NOT NULL UNIQUE,
       password TEXT NOT NULL
     );
   `);
 
-  db.prepare(
-    "INSERT OR IGNORE INTO users (username, password) VALUES ('admin', 'adminpass')"
-  ).run();
-  db.prepare(
-    "INSERT OR IGNORE INTO users (username, password) VALUES ('user', 'userpass')"
-  ).run();
+  await pool.query(`
+    INSERT INTO users (username, password) VALUES ('admin', 'adminpass')
+    ON CONFLICT (username) DO NOTHING
+  `);
+  await pool.query(`
+    INSERT INTO users (username, password) VALUES ('user1', 'userpass')
+    ON CONFLICT (username) DO NOTHING
+  `);
 
-  return db;
+  return pool;
 }
 
-function runVulnerableLogin(username, password) {
+async function runVulnerableLogin(username, password) {
   const query = `SELECT * FROM users WHERE username='${username}' AND password='${password}'`;
 
   try {
-    const row = db.prepare(query).get();
+    const result = await pool.query(query);
+    const row = result.rows[0];
 
     if (row) {
       return {
@@ -60,4 +63,4 @@ function runVulnerableLogin(username, password) {
   }
 }
 
-module.exports = { initDb, runVulnerableLogin };
+module.exports = { initDb, runVulnerableLogin, pool };

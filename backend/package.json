@@ -7,8 +7,8 @@
     "drum": "node server.js"
   },
   "dependencies": {
-    "better-sqlite3": "^11.9.1",
     "express": "^4.21.2",
-    "express-session": "^1.18.1"
+    "express-session": "^1.18.1",
+    "pg": "^8.14.1"
   }
 }

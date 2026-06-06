@@ -8,8 +8,6 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const DRUM_SIZE = 16;
 
-initDb();
-
 // token -> реальный символ (одноразовая карта на текущий барабан)
 const drumMaps = new Map();
 
@@ -173,14 +171,14 @@ app.post('/api/clear-field', (req, res) => {
   });
 });
 
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
   const input = ensureSessionInput(req);
 
   if (!input.username || !input.password) {
     return res.status(400).json({ error: 'Сначала наберите логин и пароль на барабане.' });
   }
 
-  const { status, html } = runVulnerableLogin(input.username, input.password);
+  const { status, html } = await runVulnerableLogin(input.username, input.password);
 
   input.username = '';
   input.password = '';
@@ -194,6 +192,13 @@ app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'frontend', 'login.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`Server: http://127.0.0.1:${PORT}`);
-});
+initDb()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Server: http://127.0.0.1:${PORT}`);
+    });
+  })
+  .catch((error) => {
+    console.error('Не удалось подключиться к PostgreSQL:', error.message);
+    process.exit(1);
+  });
