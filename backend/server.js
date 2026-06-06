@@ -7,7 +7,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const PYTHON_URL = process.env.PYTHON_URL || 'http://127.0.0.1:8000';
 const INTERNAL_KEY = process.env.INTERNAL_KEY || 'dev-secret-key';
-const DRUM_SIZE = 16;
+const DRUM_SIZE = 18;
 
 // token -> реальный символ (одноразовая карта на текущий барабан)
 const drumMaps = new Map();
@@ -74,7 +74,10 @@ function buildDrum(sessionId) {
   return clientDrum;
 }
 
+const frontendDir = path.join(__dirname, '..', 'frontend');
+
 app.use(express.json());
+app.use(express.static(frontendDir));
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'drum-session-secret-change-me',
