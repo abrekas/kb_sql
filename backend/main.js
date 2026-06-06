@@ -1,10 +1,12 @@
 const { Pool } = require('pg');
 
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL is required');
+}
+
 const pool = new Pool({
-  connectionString:
-    process.env.DATABASE_URL ||
-    // 'postgresql://postgres:postgres@127.0.0.1:5432/kb_project',
-    'postgresql://neondb_owner:npg_Meo0Ay9iqsUB@ep-lucky-breeze-a2008cpo-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require',
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.PGSSLMODE === 'disable' ? false : { rejectUnauthorized: false },
 });
 
 async function initDb() {
@@ -21,7 +23,7 @@ async function initDb() {
     ON CONFLICT (username) DO NOTHING
   `);
   await pool.query(`
-    INSERT INTO users (username, password) VALUES ('user1', 'userpass')
+    INSERT INTO users (username, password) VALUES ('user2', 'abobus')
     ON CONFLICT (username) DO NOTHING
   `);
 
