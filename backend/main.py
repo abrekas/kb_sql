@@ -1,4 +1,3 @@
-import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Form, Request
@@ -6,14 +5,8 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy import text
 
-# ---------- Настройки подключения к PostgreSQL ----------
-DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "postgres")
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", "5432")
-DB_NAME = os.getenv("DB_NAME", "testdb")
-
-DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+# ---------- Настройки подключения к SQLite ----------
+DATABASE_URL = "sqlite+aiosqlite:///./test.db"
 
 
 @asynccontextmanager
@@ -26,17 +19,17 @@ async def lifespan(app: FastAPI):
         # Создаём таблицу, если её нет
         await conn.execute(text("""
             CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL UNIQUE,
                 password TEXT NOT NULL
             );
         """))
-        # Тестовые пользователи
+        # Тестовые пользователи (INSERT OR IGNORE для игнорирования дубликатов)
         await conn.execute(text(
-            "INSERT INTO users (username, password) VALUES ('admin', 'adminpass') ON CONFLICT (username) DO NOTHING"
+            "INSERT OR IGNORE INTO users (username, password) VALUES ('admin', 'adminpass')"
         ))
         await conn.execute(text(
-            "INSERT INTO users (username, password) VALUES ('user', 'userpass') ON CONFLICT (username) DO NOTHING"
+            "INSERT OR IGNORE INTO users (username, password) VALUES ('user', 'userpass')"
         ))
 
     yield  # Приложение работает
@@ -49,13 +42,13 @@ app = FastAPI(lifespan=lifespan)
 
 
 # ---------- Страница с формой ----------
-@app.get("/home", response_class=HTMLResponse)
+@app.get("/", response_class=HTMLResponse)
 async def home_page():
     return """
     <html>
         <body>
             <h2>Login (уязвимая форма)</h2>
-            <form method="post" action="/home">
+            <form method="post" action="/">
                 <label>Username:</label><br>
                 <input type="text" name="username"><br><br>
                 <label>Password:</label><br>
@@ -69,7 +62,7 @@ async def home_page():
 
 
 # ---------- Уязвимый обработчик входа ----------
-@app.post("/home", response_class=HTMLResponse)
+@app.post("/", response_class=HTMLResponse)
 async def login(request: Request, username: str = Form(...), password: str = Form(...)):
     # ⚠️ УЯЗВИМЫЙ ЗАПРОС – конкатенация пользовательского ввода ⚠️
     query = f"SELECT * FROM users WHERE username='{username}' AND password='{password}'"
@@ -81,8 +74,8 @@ async def login(request: Request, username: str = Form(...), password: str = For
             row = result.fetchone()
 
         if row:
-            return f"<h1>Welcome, {row['username']}!</h1><a href='/home'>Back</a>"
+            return f"<h1>Welcome, {row['username']}!</h1><a href='/'>Back</a>"
         else:
-            return "<h1>Invalid credentials.</h1><a href='/home'>Try again</a>"
+            return "<h1>Invalid credentials.</h1><a href='/'>Try again</a>"
     except Exception as e:
         return HTMLResponse(content=f"<h1>Database error: {e}</h1>", status_code=500)
