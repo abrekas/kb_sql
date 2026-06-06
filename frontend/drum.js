@@ -36,12 +36,15 @@ async function api(path, options = {}) {
         ...options,
     });
 
-    const data = response.headers.get('content-type')?.includes('application/json')
-        ? await response.json()
-        : null;
+    const isJson = response.headers.get('content-type')?.includes('application/json');
+    const data = isJson ? await response.json() : null;
 
     if (!response.ok) {
-        throw new Error(data?.error || `Ошибка ${response.status}`);
+        throw new Error(data?.error || data?.detail || `Ошибка ${response.status}`);
+    }
+
+    if (!data) {
+        throw new Error('Сервер вернул не-JSON ответ. Проверьте DATABASE_URL и логи деплоя.');
     }
 
     return data;

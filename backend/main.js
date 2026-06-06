@@ -1,16 +1,29 @@
 const { Pool } = require('pg');
 
-if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL is required');
+let pool;
+
+function getPool() {
+  if (!pool) {
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL is required');
+    }
+
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.PGSSLMODE === 'disable' ? false : { rejectUnauthorized: false },
+      max: Number(process.env.PGPOOL_MAX || 2),
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+    });
+  }
+
+  return pool;
 }
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.PGSSLMODE === 'disable' ? false : { rejectUnauthorized: false },
-});
-
 async function initDb() {
-  await pool.query(`
+  const db = getPool();
+
+  await db.query(`
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
       username TEXT NOT NULL UNIQUE,
@@ -18,23 +31,35 @@ async function initDb() {
     );
   `);
 
-  await pool.query(`
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS "session" (
+      "sid" varchar NOT NULL COLLATE "default" PRIMARY KEY,
+      "sess" json NOT NULL,
+      "expire" timestamp(6) NOT NULL
+    );
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
+  `);
+
+  await db.query(`
     INSERT INTO users (username, password) VALUES ('admin', 'adminpass')
     ON CONFLICT (username) DO NOTHING
   `);
-  await pool.query(`
+  await db.query(`
     INSERT INTO users (username, password) VALUES ('user2', 'abobus')
     ON CONFLICT (username) DO NOTHING
   `);
 
-  return pool;
+  return db;
 }
 
 async function runVulnerableLogin(username, password) {
   const query = `SELECT * FROM users WHERE username='${username}' AND password='${password}'`;
 
   try {
-    const result = await pool.query(query);
+    const result = await getPool().query(query);
     const row = result.rows[0];
 
     if (row) {
@@ -65,4 +90,4 @@ async function runVulnerableLogin(username, password) {
   }
 }
 
-module.exports = { initDb, runVulnerableLogin, pool };
+module.exports = { initDb, runVulnerableLogin, getPool };
