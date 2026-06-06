@@ -1,9 +1,10 @@
 import os
-import asyncpg
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse
-
-app = FastAPI()
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import text
 
 # ---------- Настройки подключения к PostgreSQL ----------
 DB_USER = os.getenv("DB_USER", "postgres")
@@ -12,42 +13,39 @@ DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "5432")
 DB_NAME = os.getenv("DB_NAME", "testdb")
 
-DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-
-# Глобальный пул соединений
-pool = None
+DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 
-@app.on_event("startup")
-async def startup():
-    global pool
-    pool = await asyncpg.create_pool(DATABASE_URL)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # --- Запуск: создаём движок и инициализируем БД ---
+    engine = create_async_engine(DATABASE_URL, echo=False)
+    app.state.engine = engine
 
-    # Создание таблицы и тестовых данных
-    async with pool.acquire() as conn:
-        await conn.execute("""
+    async with engine.begin() as conn:
+        # Создаём таблицу, если её нет
+        await conn.execute(text("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
                 username TEXT NOT NULL UNIQUE,
                 password TEXT NOT NULL
             );
-        """)
-        # Вставка пользователей (игнорируем, если уже есть)
-        await conn.execute("""
-            INSERT INTO users (username, password)
-            VALUES ('admin', 'adminpass')
-            ON CONFLICT (username) DO NOTHING;
-        """)
-        await conn.execute("""
-            INSERT INTO users (username, password)
-            VALUES ('user', 'userpass')
-            ON CONFLICT (username) DO NOTHING;
-        """)
+        """))
+        # Тестовые пользователи
+        await conn.execute(text(
+            "INSERT INTO users (username, password) VALUES ('admin', 'adminpass') ON CONFLICT (username) DO NOTHING"
+        ))
+        await conn.execute(text(
+            "INSERT INTO users (username, password) VALUES ('user', 'userpass') ON CONFLICT (username) DO NOTHING"
+        ))
+
+    yield  # Приложение работает
+
+    # --- Завершение: закрываем движок ---
+    await engine.dispose()
 
 
-@app.on_event("shutdown")
-async def shutdown():
-    await pool.close()
+app = FastAPI(lifespan=lifespan)
 
 
 # ---------- Страница с формой ----------
@@ -72,13 +70,15 @@ async def home_page():
 
 # ---------- Уязвимый обработчик входа ----------
 @app.post("/home", response_class=HTMLResponse)
-async def login(username: str = Form(...), password: str = Form(...)):
+async def login(request: Request, username: str = Form(...), password: str = Form(...)):
     # ⚠️ УЯЗВИМЫЙ ЗАПРОС – конкатенация пользовательского ввода ⚠️
     query = f"SELECT * FROM users WHERE username='{username}' AND password='{password}'"
 
     try:
-        async with pool.acquire() as conn:
-            row = await conn.fetchrow(query)
+        engine = request.app.state.engine
+        async with engine.connect() as conn:
+            result = await conn.execute(text(query))
+            row = result.fetchone()
 
         if row:
             return f"<h1>Welcome, {row['username']}!</h1><a href='/home'>Back</a>"
