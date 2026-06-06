@@ -11,8 +11,8 @@
         <div class="card">
             <h1>Login через барабан</h1>
             <p class="hint">
-                Обычные поля ввода отключены — символы можно набрать только кликом по барабану.
-                Токены одноразовые, карта символов меняется после каждого клика.
+                Обычные поля ввода отключены. Поворачивайте барабан кнопкой и выбирайте символ
+                только под язычком снизу.
             </p>
             <p class="hint">Подсказка😁: попробуйте пароль <code>' OR '1'='1</code></p>
 
@@ -37,14 +37,19 @@
             <div class="status" id="status"></div>
         </div>
 
-        <div class="card">
+        <div class="card drum-card">
             <div class="revolver-wrapper">
                 <div class="revolver-drum" id="drum"></div>
+                <div class="drum-pointer" aria-hidden="true"></div>
+            </div>
+            <div class="drum-controls">
+                <button type="button" class="btn-secondary" id="rotateBtn">↻ Повернуть барабан</button>
+                <button type="button" class="btn-primary drum-select-btn" id="selectBtn">Выбрать символ</button>
             </div>
             <div class="status" id="drumStatus">Загрузка барабана…</div>
         </div>
     </div>
 
-    <script type="module" src="drum.js"></script>
+    <script type="module" src="/drum.js"></script>
 </body>
 </html>

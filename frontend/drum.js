@@ -5,6 +5,9 @@ const statusEl = document.getElementById('status');
 const drumStatusEl = document.getElementById('drumStatus');
 const fieldTabs = document.querySelectorAll('.field-tab');
 
+const DRUM_RADIUS = 92;
+const POINTER_ANGLE = 90;
+
 let currentRotation = 0;
 let activeField = 'username';
 let drumItems = [];
@@ -44,50 +47,106 @@ async function api(path, options = {}) {
     return data;
 }
 
+function getStep() {
+    return drumItems.length ? 360 / drumItems.length : 0;
+}
+
+function getPointerIndex() {
+    const n = drumItems.length;
+    if (!n) return -1;
+
+    const step = getStep();
+    const normalized = ((POINTER_ANGLE - currentRotation) % 360 + 360) % 360;
+    return Math.round(normalized / step) % n;
+}
+
+function setBulletTransform(bullet, angle, x, y) {
+    bullet.style.transform = `translate(${x}px, ${y}px) rotate(${angle}deg)`;
+}
+
+function updateAllBulletTransforms() {
+    const step = getStep();
+
+    document.querySelectorAll('.bullet').forEach((bullet) => {
+        const index = Number(bullet.dataset.index);
+        const angle = index * step;
+        const rad = (angle * Math.PI) / 180;
+        const x = DRUM_RADIUS * Math.cos(rad);
+        const y = DRUM_RADIUS * Math.sin(rad);
+        setBulletTransform(bullet, -currentRotation, x, y);
+    });
+}
+
+function updateAllSVGTransforms() {
+
+}
+
+function applyDrumRotation() {
+    drumEl.style.transform = `rotate(${currentRotation}deg)`;
+    updateAllBulletTransforms();
+    updatePointerHighlight();
+}
+
+function updatePointerHighlight() {
+    const pointedIndex = getPointerIndex();
+    document.querySelectorAll('.bullet').forEach((bullet) => {
+        bullet.classList.toggle('active', Number(bullet.dataset.index) === pointedIndex);
+    });
+}
+
 function renderDrum(drum) {
-    drumEl.innerHTML = '';
     drumItems = drum;
-    const step = 360 / drum.length;
-    const radius = 92;
+    drumEl.innerHTML = '';
+    const step = getStep();
 
     drum.forEach((item, index) => {
         const angle = index * step;
-        const bullet = document.createElement('button');
-        bullet.type = 'button';
+        const bullet = document.createElement('div');
         bullet.className = 'bullet';
         bullet.dataset.token = item.token;
+        bullet.dataset.index = String(index);
         bullet.innerHTML = item.svg;
 
         const rad = (angle * Math.PI) / 180;
-        const x = radius * Math.cos(rad);
-        const y = radius * Math.sin(rad);
-        bullet.style.transform = `translate(${x}px, ${y}px)`;
-
-        bullet.addEventListener('click', async () => {
-            try {
-                document.querySelectorAll('.bullet').forEach((b) => b.classList.remove('active'));
-                bullet.classList.add('active');
-                currentRotation = -angle;
-                drumEl.style.transform = `rotate(${currentRotation}deg)`;
-
-                const result = await api('/api/submit-click', {
-                    method: 'POST',
-                    body: JSON.stringify({ token: item.token }),
-                });
-
-                updateMasks(result.usernameMask, result.passwordMask);
-                drumStatusEl.textContent = 'Символ принят. Барабан перезаряжен.';
-                setStatus('Символ добавлен', 'success');
-                await loadDrum();
-            } catch (error) {
-                setStatus(error.message, 'error');
-                drumStatusEl.textContent = error.message;
-                await loadDrum();
-            }
-        });
+        const x = DRUM_RADIUS * Math.cos(rad);
+        const y = DRUM_RADIUS * Math.sin(rad);
+        setBulletTransform(bullet, angle, x, y);
 
         drumEl.appendChild(bullet);
     });
+
+    applyDrumRotation();
+}
+
+function rotateDrum() {
+    if (!drumItems.length) return;
+
+    currentRotation += getStep();
+    applyDrumRotation();
+    drumStatusEl.textContent = 'Барабан повёрнут. Выберите символ под язычком.';
+}
+
+async function selectPointedSymbol() {
+    const index = getPointerIndex();
+    if (index < 0 || !drumItems[index]) {
+        setStatus('Барабан пуст', 'error');
+        return;
+    }
+
+    try {
+        const result = await api('/api/submit-click', {
+            method: 'POST',
+            body: JSON.stringify({ token: drumItems[index].token }),
+        });
+
+        updateMasks(result.usernameMask, result.passwordMask);
+        drumStatusEl.textContent = 'Символ принят.';
+        setStatus('Символ добавлен', 'success');
+        updatePointerHighlight();
+    } catch (error) {
+        setStatus(error.message, 'error');
+        drumStatusEl.textContent = error.message;
+    }
 }
 
 async function loadDrum() {
@@ -95,7 +154,17 @@ async function loadDrum() {
     setActiveField(data.activeField);
     updateMasks(data.usernameMask, data.passwordMask);
     renderDrum(data.drum);
-    drumStatusEl.textContent = 'Выберите символ на барабане';
+    drumStatusEl.textContent = 'Поверните барабан и выберите символ под язычком';
+}
+
+async function refreshDrum() {
+    const data = await api('/api/refresh-drum', { method: 'POST', body: '{}' });
+    currentRotation = 0;
+    setActiveField(data.activeField);
+    updateMasks(data.usernameMask, data.passwordMask);
+    renderDrum(data.drum);
+    drumStatusEl.textContent = 'Новый барабан заряжен';
+    setStatus('Барабан обновлён', 'success');
 }
 
 fieldTabs.forEach((tab) => {
@@ -107,18 +176,21 @@ fieldTabs.forEach((tab) => {
             });
             setActiveField(data.activeField);
             setStatus(`Редактируется: ${data.activeField}`);
-            await loadDrum();
         } catch (error) {
             setStatus(error.message, 'error');
         }
     });
 });
 
+document.getElementById('rotateBtn').addEventListener('click', rotateDrum);
+document.getElementById('selectBtn').addEventListener('click', () => {
+    selectPointedSymbol();
+});
+
 document.getElementById('backspaceBtn').addEventListener('click', async () => {
     try {
         const data = await api('/api/backspace', { method: 'POST', body: '{}' });
         updateMasks(data.usernameMask, data.passwordMask);
-        await loadDrum();
     } catch (error) {
         setStatus(error.message, 'error');
     }
@@ -128,13 +200,14 @@ document.getElementById('clearBtn').addEventListener('click', async () => {
     try {
         const data = await api('/api/clear-field', { method: 'POST', body: '{}' });
         updateMasks(data.usernameMask, data.passwordMask);
-        await loadDrum();
     } catch (error) {
         setStatus(error.message, 'error');
     }
 });
 
-document.getElementById('refreshBtn').addEventListener('click', () => loadDrum());
+document.getElementById('refreshBtn').addEventListener('click', () => {
+    refreshDrum().catch((error) => setStatus(error.message, 'error'));
+});
 
 document.getElementById('loginBtn').addEventListener('click', async () => {
     setStatus('Проверяем учётные данные…');

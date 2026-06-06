@@ -84,17 +84,40 @@ h1 {
     margin-bottom: 4px;
 }
 
+.drum-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
 .revolver-wrapper {
     position: relative;
     width: 280px;
-    height: 280px;
+    height: 300px;
     margin: 0 auto;
 }
 
+.drum-pointer {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 14px solid transparent;
+    border-right: 14px solid transparent;
+    border-bottom: 22px solid #d9534f;
+    filter: drop-shadow(0 0 6px rgba(217, 83, 79, 0.6));
+    z-index: 2;
+    pointer-events: none;
+}
+
 .revolver-drum {
-    position: relative;
-    width: 100%;
-    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 280px;
+    height: 280px;
     border-radius: 50%;
     border: 5px solid #555;
     background: #222;
@@ -111,21 +134,29 @@ h1 {
     margin-top: -28px;
     margin-left: -28px;
     border-radius: 50%;
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
+    pointer-events: none;
+    transition: box-shadow 0.2s, border-color 0.2s;
     border: 2px solid #777;
     overflow: hidden;
     background: #444;
 }
 
-.bullet:hover {
-    transform: scale(1.08);
-    box-shadow: 0 0 12px rgba(217, 83, 79, 0.5);
-}
-
 .bullet.active {
     border-color: #d9534f;
     box-shadow: 0 0 14px #d9534f;
+}
+
+.drum-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    margin-top: 16px;
+}
+
+.drum-select-btn {
+    width: 100%;
+    margin-top: 0;
 }
 
 .bullet svg {

@@ -7,7 +7,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const PYTHON_URL = process.env.PYTHON_URL || 'http://127.0.0.1:8000';
 const INTERNAL_KEY = process.env.INTERNAL_KEY || 'dev-secret-key';
-const DRUM_SIZE = 18;
+const DRUM_SIZE = 16;
 
 // token -> реальный символ (одноразовая карта на текущий барабан)
 const drumMaps = new Map();
@@ -42,8 +42,6 @@ function createToken() {
 
 /** SVG без отдельного поля «буква» в JSON — символ только внутри разметки */
 function buildGlyphSvg(char) {
-  const rotate = (Math.random() * 16 - 8).toFixed(2);
-  const skew = (Math.random() * 6 - 3).toFixed(2);
   const escaped = char
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -87,17 +85,32 @@ app.use(
   })
 );
 
-app.get('/api/get-drum', (req, res) => {
-  const sessionId = req.session.id;
+function drumStateResponse(req) {
   const input = ensureSessionInput(req);
-  const drum = buildDrum(sessionId);
-
-  res.json({
-    drum,
+  return {
+    drum: req.session.drumClient || [],
     activeField: input.activeField,
     usernameMask: '*'.repeat(input.username.length),
     passwordMask: '*'.repeat(input.password.length),
-  });
+  };
+}
+
+app.get('/api/get-drum', (req, res) => {
+  const sessionId = req.session.id;
+
+  if (!req.session.drumClient) {
+    req.session.drumClient = buildDrum(sessionId);
+  }
+
+  res.json(drumStateResponse(req));
+});
+
+app.post('/api/refresh-drum', (req, res) => {
+  const sessionId = req.session.id;
+  burnDrum(sessionId);
+  req.session.drumClient = buildDrum(sessionId);
+
+  res.json(drumStateResponse(req));
 });
 
 app.post('/api/set-field', (req, res) => {
@@ -108,7 +121,6 @@ app.post('/api/set-field', (req, res) => {
 
   const input = ensureSessionInput(req);
   input.activeField = field;
-  burnDrum(req.session.id);
 
   res.json({ success: true, activeField: field });
 });
@@ -126,8 +138,6 @@ app.post('/api/submit-click', (req, res) => {
   const input = ensureSessionInput(req);
   input[input.activeField] += realChar;
 
-  burnDrum(sessionId);
-
   res.json({
     success: true,
     message: 'Символ принят',
@@ -141,7 +151,6 @@ app.post('/api/backspace', (req, res) => {
   const input = ensureSessionInput(req);
   const field = input.activeField;
   input[field] = input[field].slice(0, -1);
-  burnDrum(req.session.id);
 
   res.json({
     success: true,
@@ -154,7 +163,6 @@ app.post('/api/backspace', (req, res) => {
 app.post('/api/clear-field', (req, res) => {
   const input = ensureSessionInput(req);
   input[input.activeField] = '';
-  burnDrum(req.session.id);
 
   res.json({
     success: true,
