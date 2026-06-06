@@ -36,15 +36,23 @@ async function api(path, options = {}) {
         ...options,
     });
 
-    const isJson = response.headers.get('content-type')?.includes('application/json');
-    const data = isJson ? await response.json() : null;
+    const text = await response.text();
+    let data = null;
+
+    if (text) {
+        try {
+            data = JSON.parse(text);
+        } catch {
+            data = null;
+        }
+    }
 
     if (!response.ok) {
-        throw new Error(data?.error || data?.detail || `Ошибка ${response.status}`);
+        throw new Error(data?.error || data?.detail || text.slice(0, 160) || `Ошибка ${response.status}`);
     }
 
     if (!data) {
-        throw new Error('Сервер вернул не-JSON ответ. Проверьте DATABASE_URL и логи деплоя.');
+        throw new Error(`Сервер вернул не-JSON (${response.status}): ${text.slice(0, 160)}`);
     }
 
     return data;
@@ -137,7 +145,7 @@ async function selectPointedSymbol() {
     }
 
     try {
-        const result = await api('/api/submit-click', {
+        const result = await api('/drum/submit-click', {
             method: 'POST',
             body: JSON.stringify({ token: drumItems[index].token }),
         });
@@ -153,7 +161,7 @@ async function selectPointedSymbol() {
 }
 
 async function loadDrum() {
-    const data = await api('/api/get-drum');
+    const data = await api('/drum/get-drum');
     setActiveField(data.activeField);
     updateMasks(data.usernameMask, data.passwordMask);
     renderDrum(data.drum);
@@ -161,7 +169,7 @@ async function loadDrum() {
 }
 
 async function refreshDrum() {
-    const data = await api('/api/refresh-drum', { method: 'POST', body: '{}' });
+    const data = await api('/drum/refresh-drum', { method: 'POST', body: '{}' });
     currentRotation = 0;
     setActiveField(data.activeField);
     updateMasks(data.usernameMask, data.passwordMask);
@@ -173,7 +181,7 @@ async function refreshDrum() {
 fieldTabs.forEach((tab) => {
     tab.addEventListener('click', async () => {
         try {
-            const data = await api('/api/set-field', {
+            const data = await api('/drum/set-field', {
                 method: 'POST',
                 body: JSON.stringify({ field: tab.dataset.field }),
             });
@@ -192,7 +200,7 @@ document.getElementById('selectBtn').addEventListener('click', () => {
 
 document.getElementById('backspaceBtn').addEventListener('click', async () => {
     try {
-        const data = await api('/api/backspace', { method: 'POST', body: '{}' });
+        const data = await api('/drum/backspace', { method: 'POST', body: '{}' });
         updateMasks(data.usernameMask, data.passwordMask);
     } catch (error) {
         setStatus(error.message, 'error');
@@ -201,7 +209,7 @@ document.getElementById('backspaceBtn').addEventListener('click', async () => {
 
 document.getElementById('clearBtn').addEventListener('click', async () => {
     try {
-        const data = await api('/api/clear-field', { method: 'POST', body: '{}' });
+        const data = await api('/drum/clear-field', { method: 'POST', body: '{}' });
         updateMasks(data.usernameMask, data.passwordMask);
     } catch (error) {
         setStatus(error.message, 'error');
@@ -215,7 +223,7 @@ document.getElementById('refreshBtn').addEventListener('click', () => {
 document.getElementById('loginBtn').addEventListener('click', async () => {
     setStatus('Проверяем учётные данные…');
     try {
-        const response = await fetch('/api/login', {
+        const response = await fetch('/drum/login', {
             method: 'POST',
             credentials: 'same-origin',
         });

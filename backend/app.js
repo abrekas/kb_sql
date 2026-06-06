@@ -126,7 +126,12 @@ function createApp() {
     })
   );
 
-  app.get('/api/get-drum', apiHandler(async (req, res) => {
+  // Stormkit резервирует /api/* для своих serverless-роутов — используем /drum/*
+  app.get('/drum/health', (_req, res) => {
+    res.json({ ok: true });
+  });
+
+  app.get('/drum/get-drum', apiHandler(async (req, res) => {
     if (!req.session.drumClient) {
       buildDrum(req);
     }
@@ -134,13 +139,13 @@ function createApp() {
     res.json(drumStateResponse(req));
   }));
 
-  app.post('/api/refresh-drum', apiHandler(async (req, res) => {
+  app.post('/drum/refresh-drum', apiHandler(async (req, res) => {
     burnDrum(req);
     buildDrum(req);
     res.json(drumStateResponse(req));
   }));
 
-  app.post('/api/set-field', apiHandler(async (req, res) => {
+  app.post('/drum/set-field', apiHandler(async (req, res) => {
     const { field } = req.body;
     if (field !== 'username' && field !== 'password') {
       return res.status(400).json({ error: 'Недопустимое поле' });
@@ -152,7 +157,7 @@ function createApp() {
     res.json({ success: true, activeField: field });
   }));
 
-  app.post('/api/submit-click', apiHandler(async (req, res) => {
+  app.post('/drum/submit-click', apiHandler(async (req, res) => {
     const { token } = req.body;
     const currentMap = req.session?.drumTokenMap;
 
@@ -173,7 +178,7 @@ function createApp() {
     });
   }));
 
-  app.post('/api/backspace', apiHandler(async (req, res) => {
+  app.post('/drum/backspace', apiHandler(async (req, res) => {
     const input = ensureSessionInput(req);
     const field = input.activeField;
     input[field] = input[field].slice(0, -1);
@@ -186,7 +191,7 @@ function createApp() {
     });
   }));
 
-  app.post('/api/clear-field', apiHandler(async (req, res) => {
+  app.post('/drum/clear-field', apiHandler(async (req, res) => {
     const input = ensureSessionInput(req);
     input[input.activeField] = '';
 
@@ -198,7 +203,7 @@ function createApp() {
     });
   }));
 
-  app.post('/api/login', apiHandler(async (req, res) => {
+  app.post('/drum/login', apiHandler(async (req, res) => {
     const input = ensureSessionInput(req);
 
     if (!input.username || !input.password) {
@@ -221,7 +226,7 @@ function createApp() {
   app.use((err, req, res, _next) => {
     console.error('API error:', err);
 
-    if (req.path.startsWith('/api')) {
+    if (req.path.startsWith('/drum')) {
       return res.status(500).json({
         error: err.message || 'Internal server error',
       });
