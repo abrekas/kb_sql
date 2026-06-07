@@ -71,7 +71,7 @@ function buildDrum(sessionId) {
   return clientDrum;
 }
 
-const frontendDir = path.join(__dirname, '..', 'frontend');
+const frontendDir = path.join(__dirname, '..', '..', 'frontend');
 
 app.use(express.json());
 app.use(express.static(frontendDir));
@@ -189,7 +189,7 @@ app.post('/api/login', async (req, res) => {
 });
 
 app.get('/', (_req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'frontend', 'login.html'));
+  res.sendFile(path.join(__dirname, '..', '..', 'frontend', 'index.html'));
 });
 
 // Инициализация БД без ожидания (не блокируем загрузку модуля)
